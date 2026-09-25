@@ -1,0 +1,67 @@
+# Render configuration (optional - can also use web UI)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: nfe-joalherias
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_KEY
+        sync: false # generate securely
+      - key: ODOO_ENABLED
+        value: "1"
+      - key: ODOO_URL
+        value: https://fiscal-cloud-joalherias.odoo.com
+      - key: ODOO_DB
+        value: fiscal-cloud-joalherias
+      - key: ODOO_USER
+        value: marcus@nytro.com.br
+      - key: ODOO_API_KEY
+        sync: false
+      - key: ODOO_POLLING_MS
+        value: "20000"
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CERT_COLLECTION
+        value: certificados
+      - key: FIREBASE_CERT_DOC_ID
+        value: joalheria-a1
+      - key: NFE_EMISSAO_MODO
+        value: proprio
+      - key: NFE_UF
+        value: PR
+      - key: NFE_TP_AMB
+        value: "2"
+      - key: NFE_CERT_KEK
+        sync: false
+      - key: NFE_DANFE_PROVIDER
+        value: local
+      - key: NFE_TLS_INSECURE
+        value: "0"
+      - key: JOALHERIA_REGIME_TRIBUTARIO
+        value: simples_nacional
+
+  # Cron para garantir polling em ambiente serverless
+  - type: cron
+    name: nfe-joalherias-polling
+    runtime: node
+    plan: starter
+    schedule: "*/5 * * * *"  # a cada 5 minutos
+    buildCommand: "true"
+    startCommand: "curl -s -H 'x-api-key: $API_KEY' $RENDER_EXTERNAL_URL/api/v1/nfe/process-pending || true"
+    envVars:
+      - key: API_KEY
+        sync: false
+      - from: nfe-joalherias
+        key: API_KEY
