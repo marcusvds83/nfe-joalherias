@@ -185,6 +185,19 @@ campos_custo_produto = [
 for c in campos_custo_produto:
     upsert_field(pt_id, **c)
 
+# Campos x_joalheria_* no product.template (NCM, CFOP, descricao NFE, etc.)
+# Esses campos sao necessarios porque o formulario principal do produto
+# eh do product.template (nao product.product).
+campos_joalheria_pt = [
+    {'name': 'x_joalheria_ncm', 'field_description': 'NCM Especifico (Joalheria)', 'ttype': 'char'},
+    {'name': 'x_joalheria_cfop', 'field_description': 'CFOP Default (Joalheria)', 'ttype': 'char'},
+    {'name': 'x_joalheria_descricao_nfe', 'field_description': 'Descricao NF-e (Joalheria)', 'ttype': 'text'},
+    {'name': 'x_joalheria_unidade_medida', 'field_description': 'Unidade Medida NF-e (Joalheria)', 'ttype': 'char'},
+    {'name': 'x_joalheria_peso_ouro_kg', 'field_description': 'Peso Ouro (kg) p/ Exportacao', 'ttype': 'float'},
+]
+for c in campos_joalheria_pt:
+    upsert_field(pt_id, **c)
+
 # ============================================================
 # 2. VIEW NO PRODUTO (adiciona abas)
 # ============================================================
