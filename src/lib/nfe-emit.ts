@@ -323,19 +323,33 @@ export async function emitirNfeOdoo(moveId: number): Promise<EmissionResult> {
     `[NFE-EMIT] Tomador: ${partner.name} CNPJ=${partner._cnpj} CPF=${partner._cpf} Cidade=${partner._cidade}/${partner._uf}`
   );
 
-  // 7. Leitura das linhas
-  const allLines = await read<LineData>('account.move.line', move.invoice_line_ids, [
+  // 7. Leitura das linhas (inclui campos customizados x_joa_* da linha)
+  const allLines = await read<LineData & Record<string, unknown>>('account.move.line', move.invoice_line_ids, [
     'name', 'quantity', 'price_unit', 'price_subtotal', 'product_id', 'tax_ids', 'display_type',
+    // Campos customizados joalheiro na linha (permitem override por venda)
+    'x_joa_peso_ouro_g', 'x_joa_custo_metal_g', 'x_joa_custo_metal_total',
+    'x_joa_custo_pedras_usd', 'x_joa_cotacao_usd_brl', 'x_joa_custo_pedras_brl',
+    'x_joa_custo_mao_obra', 'x_joa_custo_total_unit', 'x_joa_markup_pct',
+    'x_joa_preco_calculado_unit', 'x_joa_tipo_operacao',
   ]);
   const serviceLines = allLines.filter((l) => !l.display_type && l.price_subtotal > 0);
 
-  // 8. Leitura dos produtos (com campos customizados joalheria)
+  // 8. Leitura dos produtos (com campos x_joa_* do product.template)
   const productIds = serviceLines
     .filter((l) => l.product_id)
     .map((l) => l.product_id![0])
     .filter(Boolean);
+  // Note: campos product.template ficam em product.product tambem (relacionados)
   const camposProdutoDesejados = [
     'name', 'default_code', 'barcode', 'weight',
+    // Campos customizados joalheiro (herdados do product.template)
+    'x_joa_peso_ouro_g', 'x_joa_peso_ouro_kg',
+    'x_joa_custo_metal_g', 'x_joa_custo_metal_total',
+    'x_joa_custo_pedras_usd', 'x_joa_cotacao_usd_brl', 'x_joa_custo_pedras_brl',
+    'x_joa_custo_mao_obra', 'x_joa_custo_total', 'x_joa_markup_pct',
+    'x_joa_preco_calculado', 'x_joa_moeda_ref',
+    'x_joa_excecao_fiscal_uf', 'x_joa_aliquota_icms_especial',
+    // Campos legados (mantidos por compatibilidade)
     'x_joalheria_peso_ouro_kg', 'x_joalheria_ncm',
     'x_joalheria_cfop', 'x_joalheria_descricao_nfe',
     'x_joalheria_unidade_medida',
@@ -354,31 +368,64 @@ export async function emitirNfeOdoo(moveId: number): Promise<EmissionResult> {
     x_joalheria_nfe_numero: proximoNumero,
   });
 
-  // 10. Monta o tipo de operacao (default: venda)
-  const tipoOperacaoRaw = (move.x_joalheria_nfe_tipo_operacao as string) || 'venda';
+  // 10. Monta o tipo de operacao (default: venda, mas pode vir da linha x_joa_tipo_operacao)
+  const tipoOperacaoRaw = (move.x_joalheria_nfe_tipo_operacao as string)
+    || (serviceLines[0]?.x_joa_tipo_operacao as string)
+    || 'venda';
   const tipoOperacao = ['venda', 'remessa_industrializacao', 'retorno_industrializacao', 'exportacao']
     .includes(tipoOperacaoRaw) ? tipoOperacaoRaw as any : 'venda';
 
   // 11. Constroi a lista de produtos para a NF-e
+  // Logica de precificacao: campos x_joa_* da linha (override) ou do produto (default)
   const produtos: ProdutoData[] = serviceLines.map((line, idx) => {
     const product = line.product_id ? productMap[line.product_id[0]] : null;
+
+    // Peso de ouro em gramas (linha override > produto)
+    const pesoOuroG = (line.x_joa_peso_ouro_g as number) ?? (product?.x_joa_peso_ouro_g as number) ?? 0;
+    const pesoOuroKg = ((product?.x_joa_peso_ouro_kg as number) ?? 0) || (pesoOuroG / 1000);
+
+    // Custos (linha override > produto)
+    const custoMetalTotal = (line.x_joa_custo_metal_total as number)
+      ?? ((line.x_joa_custo_metal_g as number) ?? (product?.x_joa_custo_metal_g as number) ?? 0) * pesoOuroG;
+    const custoPedrasBrl = (line.x_joa_custo_pedras_brl as number)
+      ?? ((line.x_joa_custo_pedras_usd as number) ?? (product?.x_joa_custo_pedras_usd as number) ?? 0)
+          * ((line.x_joa_cotacao_usd_brl as number) ?? (product?.x_joa_cotacao_usd_brl as number) ?? 5.20);
+    const custoMaoObra = (line.x_joa_custo_mao_obra as number) ?? (product?.x_joa_custo_mao_obra as number) ?? 0;
+
+    // CFOP e NCM
     const cfop = pickCfop(tipoOperacao, company._uf, partner._uf);
+
+    // Descricao com info de composicao (joalheiro)
+    const descricaoBase = (product?.x_joalheria_descricao_nfe as string) ||
+                          (product?.x_joa_preco_calculado ? product.name : null) ||
+                          product?.name ||
+                          line.name ||
+                          'Produto sem descricao';
+    // Acrescenta detalhe de peso para exportacao
+    let xProd = descricaoBase;
+    if (tipoOperacao === 'exportacao' && pesoOuroG > 0) {
+      xProd += ` (Peso ouro: ${pesoOuroG.toFixed(3)}g)`;
+    } else if (pesoOuroG > 0) {
+      xProd += ` - Ouro ${pesoOuroG.toFixed(2)}g`;
+    }
+
     return {
       nItem: idx + 1,
       cProd: product?.default_code || String(idx + 1).padStart(3, '0'),
       cEan: product?.barcode || 'SEM GTIN',
-      xProd: (product?.x_joalheria_descricao_nfe as string) ||
-              product?.name ||
-              line.name ||
-              'Produto sem descricao',
+      xProd,
       ncm: (product?.x_joalheria_ncm as string) || config.joalheria.ouroCodigoNcm,
-      cfop: cfop,
+      cfop: (product?.x_joalheria_cfop as string) || cfop,
       uCom: (product?.x_joalheria_unidade_medida as string) || 'UND',
       qCom: line.quantity,
       vUnCom: line.price_unit,
       vProd: line.price_subtotal,
-      pesoOuroKg: (product?.x_joalheria_peso_ouro_kg as number) || undefined,
-    };
+      pesoOuroKg: pesoOuroKg || undefined,
+      // Novos campos de custo para infAdProd (detalhamento)
+      _custoMetal: custoMetalTotal,
+      _custoPedras: custoPedrasBrl,
+      _custoMaoObra: custoMaoObra,
+    } as any;
   });
 
   // 12. Monta dados do NFe

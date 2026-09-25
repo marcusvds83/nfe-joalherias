@@ -897,16 +897,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
     const client = getApiClient();
     const key = client.getApiKey();
     if (key) {
       client.health()
-        .then(() => setAuthenticated(true))
+        .then(() => { if (mounted) setAuthenticated(true); })
         .catch(() => client.clearApiKey())
-        .finally(() => setLoading(false));
+        .finally(() => { if (mounted) setLoading(false); });
     } else {
-      setLoading(false);
+      if (mounted) setLoading(false);
     }
+    return () => { mounted = false; };
   }, []);
 
   if (loading) {
