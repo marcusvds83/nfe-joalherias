@@ -13,9 +13,21 @@
  */
 
 import crypto from 'crypto';
-import admin from 'firebase-admin';
 import { config, firebaseConfigured } from './config';
 import { openPfx, infoFromCertPem, type ParsedCert } from './pfx';
+
+// Lazy-load firebase-admin (evita crash no startup se env vars estiverem erradas)
+let _admin: typeof import('firebase-admin') | null = null;
+async function getAdmin() {
+  if (_admin) return _admin;
+  try {
+    _admin = await import('firebase-admin');
+    return _admin;
+  } catch (e) {
+    console.error('[FIREBASE-CERT] Erro ao importar firebase-admin:', (e as Error).message);
+    throw e;
+  }
+}
 
 // === Cache em memoria ===
 interface CachedCert {
@@ -29,10 +41,10 @@ interface CachedCert {
 let cache: CachedCert | null = null;
 
 // === Inicializacao do Firebase ===
-let db: admin.firestore.Firestore | null = null;
+let db: any = null;
 let firebaseReady = false;
 
-function initFirebase(): void {
+async function initFirebase(): Promise<void> {
   if (firebaseReady) return;
   if (!firebaseConfigured()) {
     console.warn(
@@ -41,20 +53,22 @@ function initFirebase(): void {
     return;
   }
   try {
-    if (admin.apps.length === 0) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
+    const adminLib = await getAdmin();
+    if (adminLib.apps.length === 0) {
+      adminLib.initializeApp({
+        credential: adminLib.credential.cert({
           projectId: config.firebase.projectId,
           privateKey: config.firebase.privateKey,
           clientEmail: config.firebase.clientEmail,
         }),
       });
     }
-    db = admin.firestore();
+    db = adminLib.firestore();
     firebaseReady = true;
     console.log(`[FIREBASE-CERT] Firebase inicializado. Projeto: ${config.firebase.projectId}`);
   } catch (e) {
     console.error('[FIREBASE-CERT] Falha ao inicializar Firebase:', (e as Error).message);
+    // Nao lanca erro - deixa o app continuar rodando sem Firebase
   }
 }
 
@@ -96,7 +110,7 @@ export async function salvarCertificado(
   const aberto = openPfx(pfxBuffer, senha);
 
   // Tenta Firebase primeiro
-  initFirebase();
+  await initFirebase();
   if (db) {
     const doc = {
       pfxBase64: pfxBuffer.toString('base64'),
@@ -153,7 +167,7 @@ export async function carregarCertificado(): Promise<CachedCert | null> {
   }
 
   // 2) Firebase Firestore
-  initFirebase();
+  await initFirebase();
   if (!db) {
     console.warn('[FIREBASE-CERT] Firebase indisponivel. Nenhum certificado carregado.');
     return null;
@@ -196,7 +210,7 @@ export async function statusCertificado(): Promise<Record<string, unknown>> {
   }
 
   // Tenta Firebase
-  initFirebase();
+  await initFirebase();
   if (!db) {
     // Verifica env vars
     if (process.env.NFE_CERT_PFX_BASE64 && process.env.NFE_CERT_SENHA) {
@@ -228,7 +242,7 @@ export async function statusCertificado(): Promise<Record<string, unknown>> {
 
 /** Remove o certificado do Firebase e do cache. */
 export async function removerCertificado(): Promise<boolean> {
-  initFirebase();
+  await initFirebase();
   if (db) {
     try {
       await db.collection(config.firebase.collection).doc(config.firebase.docId).delete();
