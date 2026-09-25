@@ -1,20 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /**
  * GET /admin - Redireciona para a pagina principal do painel.
  * Mantido por compatibilidade com o padrao do AJL/Accel.
  * 
- * Usa redirect RELATIVO (nao URL absoluta) para funcionar em qualquer host:
- * - Em producao (Render): https://nfe-joalherias.onrender.com/admin -> /
- * - Em desenvolvimento: http://localhost:3000/admin -> /
+ * Usa redirect RELATIVO (Location: /) para funcionar em qualquer host:
+ * - O navegador resolve automaticamente para o dominio atual
+ * - Funciona em producao (Render) e desenvolvimento (localhost)
+ * - Nao depende de headers Host/Origin (que podem estar errados em proxy)
  */
 
-export async function GET(req: NextRequest) {
-  // Redirect relativo para / (funciona em qualquer dominio)
-  const baseUrl = req.nextUrl.origin || 'http://localhost:3000';
-  return NextResponse.redirect(new URL('/', baseUrl), {
+export async function GET() {
+  // Redirect simples e robusto: so o caminho relativo "/"
+  // O navegador resolve para https://nfe-joalherias.onrender.com/ automaticamente
+  return new NextResponse(null, {
     status: 302,
     headers: {
+      'Location': '/',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
     },
   });
