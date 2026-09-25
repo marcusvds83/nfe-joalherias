@@ -1,11 +1,24 @@
 /**
  * GET /api/v1/health - Health check do middleware NF-e Joalherias
+ * GET /api/v1/health?keepalive=1 - Tambem processa NF-e pendentes (mantem o Render acordado)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { config, odooConfigured, firebaseConfigured } from '@/lib/config';
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  const keepalive = req.nextUrl.searchParams.get('keepalive') === '1';
+
+  let pollingResult = null;
+  if (keepalive && odooConfigured()) {
+    try {
+      const { processPendingEmissions } = await import('@/lib/nfe-emit');
+      pollingResult = await processPendingEmissions();
+    } catch (e) {
+      console.error('[HEALTH-KEEPALIVE] Erro polling:', (e as Error).message);
+    }
+  }
+
   return NextResponse.json({
     servico: 'nfe-joalherias',
     versao: '1.0.0',
@@ -27,5 +40,6 @@ export async function GET(_req: NextRequest) {
       tp_amb: config.nfe.tpAmb === '2' ? 'homologacao' : 'producao',
       regime: config.joalheria.regimeTributario,
     },
+    ...(keepalive && pollingResult ? { keepalive: pollingResult } : {}),
   });
 }
