@@ -1,20 +1,21 @@
-# Render configuration (optional - can also use web UI)
-# Docs: https://render.com/docs/blueprint-spec
+# Render configuration - atualizado para usar npm (mais estável que bun)
 services:
   - type: web
     name: nfe-joalherias
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npm run start
     healthCheckPath: /api/v1/health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
       - key: API_KEY
-        sync: false # generate securely
+        sync: false
       - key: ODOO_ENABLED
         value: "1"
       - key: ODOO_URL
@@ -51,17 +52,19 @@ services:
         value: "0"
       - key: JOALHERIA_REGIME_TRIBUTARIO
         value: simples_nacional
+      - key: JOALHERIA_OURO_CODIGO_NCM
+        value: "71131900"
+      - key: JOALHERIA_MOEDA_REF
+        value: BRL
 
-  # Cron para garantir polling em ambiente serverless
+  # Cron para manter o serviço "acordado" e fazer polling
   - type: cron
-    name: nfe-joalherias-polling
+    name: nfe-joalherias-keepalive
     runtime: node
     plan: starter
-    schedule: "*/5 * * * *"  # a cada 5 minutos
+    schedule: "*/5 * * * *"  # a cada 5 min
     buildCommand: "true"
-    startCommand: "curl -s -H 'x-api-key: $API_KEY' $RENDER_EXTERNAL_URL/api/v1/nfe/process-pending || true"
+    startCommand: "curl -fs -H 'x-api-key: $API_KEY' $RENDER_EXTERNAL_URL/api/v1/process-pending || true"
     envVars:
       - key: API_KEY
         sync: false
-      - from: nfe-joalherias
-        key: API_KEY
