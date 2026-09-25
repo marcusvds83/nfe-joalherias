@@ -13,7 +13,7 @@
  */
 
 import xmlrpc from 'xmlrpc';
-import { config } from './config';
+import { config, odooConfigured } from './config';
 
 // ============================================================
 // Cliente XML-RPC (2 clientes: /common para auth, /object para dados)

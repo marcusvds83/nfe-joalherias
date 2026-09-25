@@ -1,6 +1,5 @@
 /**
  * GET /api/v1/odoo/test-connection - Testa conexao com Odoo
- * POST /api/v1/odoo/setup - Executa setup de campos customizados (placeholders)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
