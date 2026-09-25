@@ -1,201 +1,170 @@
-# 📐 Passo 3 — Criar Abas Faltantes via Odoo Studio
+# 📐 Passo 3 — Criar Views via Studio (mínimo) + Script Preenche Campos
 
-> ✅ **Já criado por você (Marcus):**
-> - `res.company` → aba NF-e (id=3928)
-> - `account.move` → aba NF-e (id=3913)
->
-> ❌ **Falta criar (este tutorial):**
-> 1. `product.template` → 2 abas (Composição de Custo + Formação de Preço)
-> 2. `sale.order` → colunas `x_joa_*` na tree das linhas
-> 3. `purchase.order` → colunas `x_joa_*` na tree das linhas
+> 🎉 **Descoberta importante:** O SaaS Trial bloqueia `create` em `ir.ui.view` via XML-RPC, MAS **permite `write` em views existentes** (incluindo as criadas pelo Studio).
 
-Cada passo leva ~3 minutos. Total: 10 minutos.
+## ✅ Estratégia definitiva (5 minutos, 3 cliques por modelo)
 
----
+1. Você cria **3 views vazias** no Studio (uma por modelo)
+2. Roda o script Python `setup-views-completo.py` que faz `write` nessas views, preenchendo TODOS os campos automaticamente
 
-## 🛠️ Passo 1 — Aba no Produto (product.template)
+## 📊 Status atual
 
-### 1.1 Abrir o Studio
-1. No Odoo (https://fiscal-cloud-joalherias.odoo.com/web), clique no **ícone Studio** (canto sup. direito, parece um escudo/paleta)
-2. Na barra lateral esquerda do Studio → clique em **"Views"**
-3. Selecione o modelo **Product** (product.template)
-4. Clique em **"Form"** — abre o formulário do produto no editor
-
-### 1.2 Criar aba "Composição de Custo"
-
-1. No formulário, localize o **notebook** (área das abas: General, Purchase, Sales, Inventory...)
-2. **Botão direito** em uma aba existente → **"Add Page"** (ou clique no `+` ao lado da última aba)
-3. **Renomeie** a nova aba para: `Composição de Custo`
-4. Clique dentro da aba (área vazia) → escolha **"Add Group"**
-5. **Renomeie** o grupo para: `Metal (Ouro)`
-6. Dentro do grupo, clique em **"Add Field"** → escolha **Float** → renomeie para `Peso Ouro (g)` → no painel direito, campo **"Field"** → selecione `x_joa_peso_ouro_g`
-7. Adicione mais 3 campos no mesmo grupo:
-   - Float `Custo Ouro/g (BRL)` → `x_joa_custo_metal_g`
-   - Float `Custo Metal Total` → `x_joa_custo_metal_total` → marque **"Read Only"** no painel direito
-8. Adicione outro **Group** chamado `Pedras` com 3 campos:
-   - Float `Custo Pedras (USD)` → `x_joa_custo_pedras_usd`
-   - Float `Cotação USD/BRL` → `x_joa_cotacao_usd_brl`
-   - Float `Custo Pedras (BRL)` → `x_joa_custo_pedras_brl` → **Read Only**
-9. Adicione outro **Group** chamado `Mão de Obra` com 1 campo:
-   - Float `Custo Mão de Obra (BRL)` → `x_joa_custo_mao_obra`
-10. Clique em **Save** (botão azul no topo do Studio)
-
-### 1.3 Criar aba "Formação de Preço"
-
-1. Clique no `+` para adicionar outra aba → renomeie para `Formação de Preço`
-2. Adicione grupo `Custos` com:
-   - Float `Custo Total` → `x_joa_custo_total` → **Read Only**
-   - Selection `Moeda Referência` → `x_joa_moeda_ref` (opções: BRL/USD/OURO)
-3. Adicione grupo `Preço Final` com:
-   - Float `Markup (%)` → `x_joa_markup_pct` (deixe editável!)
-   - Float `Preço Calculado` → `x_joa_preco_calculado` → **Read Only**
-4. Adicione grupo `Exceção Fiscal` com:
-   - Char `Exceção Fiscal UF` → `x_joa_excecao_fiscal_uf`
-   - Float `Alíquota ICMS Especial` → `x_joa_aliquota_icms_especial`
-5. **Save** no Studio
-
-### 1.4 (Opcional) Criar aba "NF-e Joalheria"
-
-Se quiser organizar os campos NF-e legados (NCM, CFOP, descrição) numa aba separada:
-1. Adicione aba `NF-e Joalheria`
-2. Adicione grupo `Dados Fiscais` com:
-   - Char `NCM` → `x_joalheria_ncm`
-   - Char `CFOP Default` → `x_joalheria_cfop`
-   - Text `Descrição NF-e` → `x_joalheria_descricao_nfe`
-   - Char `Unidade Medida` → `x_joalheria_unidade_medida`
-   - Float `Peso Ouro (kg) p/ Exportação` → `x_joalheria_peso_ouro_kg`
-3. **Save**
-
-### 1.5 Sair do Studio e testar
-1. Clique no **X** no canto sup. direito do Studio para sair
-2. Vá em **Master Data → Products** → abra qualquer produto
-3. Você verá as novas abas: **Composição de Custo**, **Formação de Preço**, (NF-e Joalheria)
-4. Preencha um produto de teste:
-   - Aba Composição: Peso Ouro (g) = `5`, Custo Ouro/g = `350`, Pedras USD = `200`, Cotação = `5.20`, Mão de Obra = `150`
-   - Aba Formação: Markup = `100`
-5. **Ação (engrenagem no topo) → "Recalcular Custos (Joalheria)"** — preenche os 4 campos Read Only
-6. **Ação → "Aplicar Preço Calculado (Joalheria)"** — copia para o `list_price`
+| Modelo | Status |
+|---|---|
+| `account.move` (Fatura/Financeiro) | ✅ PREENCHIDO pelo script (id=3913) |
+| `res.company` (Empresa) | ✅ PREENCHIDO pelo script (id=3928) |
+| `product.template` (Produto) | ❌ Você precisa criar view vazia |
+| `sale.order` (Pedido de Venda) | ❌ Você precisa criar view vazia |
+| `purchase.order` (Pedido de Compra) | ❌ Você precisa criar view vazia |
 
 ---
 
-## 🛠️ Passo 2 — Colunas na Linha do Pedido de Venda (sale.order)
+## 🛠️ Passo a passo: Criar View Vazia via Studio (3 cliques)
 
-### 2.1 Abrir o Studio no Sale Order
-1. No Odoo, vá em **Sales → Quotations** → abra um pedido
-2. Clique no **ícone Studio** (sup. direito)
-3. Na barra lateral → Views → modelo **Sale Order** (sale.order)
-4. Clique em **Form** — abre o formulário do pedido no editor
+Repita este processo para CADA um dos 3 modelos que faltam.
 
-### 2.2 Adicionar colunas na tree de linhas
-1. No formulário, localize a **tabela de linhas** (a tree com Product, Quantity, Unit Price, etc.)
-2. **Clique no cabeçalho da tree** (linha com os títulos das colunas) → escolha **"Add Column"**
-3. Adicione estas colunas (uma por vez):
-   - Float `Peso Ouro (g)` → `x_joa_peso_ouro_g`
-   - Float `Custo Ouro/g` → `x_joa_custo_metal_g`
-   - Float `Custo Pedras USD` → `x_joa_custo_pedras_usd`
-   - Float `Mão de Obra` → `x_joa_custo_mao_obra`
-   - Float `Custo Total` → `x_joa_custo_total_unit` → **Read Only**
-   - Float `Markup %` → `x_joa_markup_pct`
-   - Float `Preço Calc.` → `x_joa_preco_calculado_unit` → **Read Only**
-   - Selection `Tipo Operação` → `x_joa_tipo_operacao`
-4. **Save** no Studio
+### Para o Produto (product.template)
 
-### 2.3 Testar
-1. Saia do Studio (X)
-2. Crie um novo **Pedido de Venda** ou abra um existente
-3. Adicione uma linha com um produto que já tem composição de custo preenchida
-4. Os campos da linha virão preenchidos **automaticamente do produto** (override)
-5. Você pode **sobrescrever** qualquer campo (ex: subir pedras de 200 para 400 USD) só para essa venda
+1. No Odoo, vá em **Master Data → Products** → abra qualquer produto
+2. Clique no ícone **Studio** (canto superior direito)
+3. Na barra lateral esquerda do Studio, clique em **"Views"**
+4. Selecione o modelo **Product** (product.template)
+5. Clique em **"Form"**
+6. **Adicione um campo qualquer** (só para criar a view customizada):
+   - Clique em qualquer campo do formulário → escolha "Char" → renomeie para "stub"
+   - No painel direito, em "Field", escolha qualquer campo (ex: `x_joa_peso_ouro_g`)
+   - **Importante:** Marque `optional="hide"` se possível (mas Studio geralmente permite apenas `show`)
+7. Clique em **Save** (botão azul no topo do Studio)
+8. Clique no **X** no canto superior direito para sair do Studio
 
----
+### Para o Pedido de Venda (sale.order)
 
-## 🛠️ Passo 3 — Colunas na Linha do Pedido de Compra (purchase.order)
+1. Vá em **Sales → Quotations** → abra uma cotação
+2. Ícone **Studio**
+3. Views → **Sale Order** (sale.order) → Form
+4. Adicione campo stub → Save → saia do Studio
 
-### 3.1 Abrir o Studio no Purchase Order
+### Para o Pedido de Compra (purchase.order)
+
 1. Vá em **Purchase → Orders** → abra um pedido
-2. Clique no **ícone Studio**
-3. Barra lateral → Views → modelo **Purchase Order** (purchase.order)
-4. Clique em **Form**
-
-### 3.2 Adicionar colunas na tree
-1. Localize a **tabela de linhas**
-2. **Add Column** para cada campo:
-   - Float `Peso Ouro (g)` → `x_joa_peso_ouro_g`
-   - Float `Custo Ouro/g` → `x_joa_custo_metal_g`
-   - Float `Custo Pedras USD` → `x_joa_custo_pedras_usd`
-   - Float `Mão de Obra` → `x_joa_custo_mao_obra`
-   - Float `Custo Total` → `x_joa_custo_total_unit` → **Read Only**
-   - Selection `Tipo Operação` → `x_joa_tipo_operacao` (Compra Interna/Importação/Compra Sucata)
-3. **Save** no Studio
-
-### 3.3 Testar
-1. Saia do Studio
-2. Abra um **Pedido de Compra** novo
-3. Adicione uma linha com produto que tem composição de custo
-4. Os campos virão preenchidos do produto (override)
-5. Marque o **Tipo de Operação** conforme: `compra_interna`, `importacao`, ou `compra_sucata` (cliente paga com ouro usado)
+2. Ícone **Studio**
+3. Views → **Purchase Order** (purchase.order) → Form
+4. Adicione campo stub → Save → saia do Studio
 
 ---
 
-## ✅ Checklist final
+## 🚀 Passo final: Rodar o script
 
-Depois dos 3 passos, rode o check-status para confirmar:
+Depois de criar as 3 views vazias, rode:
 
 ```bash
 ODOO_URL=https://fiscal-cloud-joalherias.odoo.com \
-ODOO_DB=fiscal-cloud-joalherias \
-ODOO_USER=marcus@nytro.com.br \
-ODOO_API_KEY=6ec876e680e4f43fe94645c05ca6097c65e80f2d \
-python3 odoo-scripts/check-status.py
+  ODOO_DB=fiscal-cloud-joalherias \
+  ODOO_USER=marcus@nytro.com.br \
+  ODOO_API_KEY=6ec876e680e4f43fe94645c05ca6097c65e80f2d \
+  python3 odoo-scripts/setup-views-completo.py
 ```
 
-Na seção **VIEWS CUSTOMIZADAS**, deve aparecer:
-```
-Total: 5+ views customizadas
-  id=3913 | Odoo Studio: account.move.form customization
-  id=3928 | Odoo Studio: res.company.form customization
-  id=XXXX | Odoo Studio: product.template.form customization
-  id=XXXX | Odoo Studio: sale.order.form customization
-  id=XXXX | Odoo Studio: purchase.order.form customization
+O script vai:
 
-Modelos com aba NF-e já criada:
-  ['account.move', 'product.template', 'purchase.order', 'res.company', 'sale.order']
-✅ TODAS as abas criadas!
+1. Para cada modelo (`product.template`, `sale.order`, `purchase.order`):
+   - Procurar a view do Studio (nome começa com `Odoo Studio:`)
+   - Fazer `write` no `arch_db` substituindo o conteúdo antigo por TODOS os campos joalheiros
+2. Reportar o status final
+
+### Exemplo de saída esperada:
+
+```
+1/5 - product.template (Produto)
+✅ product.template: VIEW ATUALIZADA (id=XXXX)
+
+2/5 - account.move (Fatura)
+✅ account.move: VIEW ATUALIZADA (id=3913)
+
+3/5 - res.company (Empresa)
+✅ res.company: VIEW ATUALIZADA (id=3928)
+
+4/5 - sale.order (Pedido de Venda)
+✅ sale.order: VIEW ATUALIZADA (id=XXXX)
+
+5/5 - purchase.order (Pedido de Compra)
+✅ purchase.order: VIEW ATUALIZADA (id=XXXX)
+
+Views do Studio encontradas:
+  ✅ product.template
+  ✅ account.move
+  ✅ res.company
+  ✅ sale.order
+  ✅ purchase.order
 ```
 
 ---
 
-## 🆘 Problemas comuns
+## 📝 O que o script preenche em cada modelo
+
+### `product.template` — 3 abas criadas
+
+**Aba "Composição de Custo"** (com 3 grupos):
+- Grupo "Metal (Ouro)": `x_joa_peso_ouro_g`, `x_joa_peso_ouro_kg`, `x_joa_custo_metal_g`, `x_joa_custo_metal_total` (readonly)
+- Grupo "Pedras": `x_joa_custo_pedras_usd`, `x_joa_cotacao_usd_brl`, `x_joa_custo_pedras_brl` (readonly)
+- Grupo "Mão de Obra": `x_joa_custo_mao_obra`
+
+**Aba "Formação de Preço"**:
+- `x_joa_custo_total` (readonly), `x_joa_moeda_ref` (selection)
+- `x_joa_markup_pct` (editável!), `x_joa_preco_calculado` (readonly)
+- `x_joa_excecao_fiscal_uf`, `x_joa_aliquota_icms_especial`
+
+**Aba "NF-e Joalheria"**:
+- `x_joalheria_ncm`, `x_joalheria_cfop`, `x_joalheria_descricao_nfe`, `x_joalheria_unidade_medida`, `x_joalheria_peso_ouro_kg`
+
+### `account.move` — 1 aba "NF-e Joalheria"
+- Grupo "Status NF-e": `x_joalheria_nfe_status` (readonly), `x_joalheria_nfe_tipo_operacao`, `x_joalheria_nfe_dh_emissao` (readonly)
+- Grupo "Autorização SEFAZ": `x_joalheria_nfe_chave` (readonly), `x_joalheria_nfe_protocolo` (readonly)
+- Grupo "Erros e Logs": `x_joalheria_nfe_erro` (readonly)
+- Grupo "XML NF-e": `x_joalheria_nfe_xml` (readonly, widget ace)
+
+### `res.company` — 1 aba "NF-e Joalheria"
+- `x_joalheria_nfe_serie`, `x_joalheria_nfe_numero`, `x_joalheria_nfe_inscricao_estadual`
+
+### `sale.order` — 8 colunas na tree das linhas
+- `x_joa_peso_ouro_g`, `x_joa_custo_metal_g`, `x_joa_custo_pedras_usd`, `x_joa_custo_mao_obra`
+- `x_joa_custo_total_unit` (readonly), `x_joa_markup_pct`, `x_joa_preco_calculado_unit` (readonly)
+- `x_joa_tipo_operacao` (venda/remessa/retorno/exportação)
+
+### `purchase.order` — 6 colunas na tree das linhas
+- `x_joa_peso_ouro_g`, `x_joa_custo_metal_g`, `x_joa_custo_pedras_usd`, `x_joa_custo_mao_obra`
+- `x_joa_custo_total_unit` (readonly), `x_joa_tipo_operacao` (compra_interna/importação/sucata)
+
+---
+
+## 🆘 Troubleshooting
 
 | Problema | Solução |
 |---|---|
-| **Studio não aparece** | Configurações → Usuários → Marcus → ative "Studio" |
-| **Campo não aparece na lista do Studio** | O script `setup-pesos-custos-precos.py` não foi rodado. Rode primeiro. |
-| **Botão "Emitir NF-e" não aparece nas Ações** | O script `setup-completo-odoo.py` não foi rodado. |
-| **Custos não recalculam automaticamente** | Ação (engrenagem) → "Recalcular Custos (Joalheria)" — não é automático em tempo real |
-| **Preço não atualiza no `list_price`** | Ação (engrenagem) → "Aplicar Preço Calculado (Joalheria)" |
-| **Campos readonly** | Só os calculados (custo_metal_total, custo_pedras_brl, custo_total, preco_calculado). Os outros (peso, custos base, markup, moeda, exceção) são todos editáveis |
+| Script diz "SEM view do Studio" para um modelo | Você precisa criar a view vazia no Studio (3 cliques, tutorial acima) |
+| View do Studio existe mas script falha | Faça logout/login no Odoo (cache) e rode novamente |
+| Campos não aparecem na tela após rodar script | Faça logout/login no Odoo. Cache do navegador pode exigir Ctrl+F5 |
+| Studio não aparece no ícone superior | Configurações → Usuários → Marcus → ative "Studio" |
+| Erro de XPath no script | A view base do Studio pode estar diferente. Reporte o erro. |
 
 ---
 
-## 🔄 Rotina Resumida (depois de configurado)
+## 📋 Após preencher tudo (validação)
 
-**Cadastro de produto (1x):**
-1. Abra o produto → aba **Composição de Custo** → preencha peso + custos
-2. Aba **Formação de Preço** → preencha Markup
-3. **Ação → Recalcular Custos** → calcula custo_total + preco_calculado
-4. **Ação → Aplicar Preço Calculado** → copia para `list_price`
+Rode o `check-status.py` para confirmar:
 
-**Pedido de venda (diário):**
-1. Novo Pedido → adicione linha de produto
-2. Campos de composição vêm do produto automaticamente
-3. **Override**: se cliente pediu algo diferente (ex: 2 pedras em vez de 1), ajuste só nessa linha
-4. Confirme o pedido → gera fatura (account.move)
-5. Na fatura → **Ação → Emitir NF-e** → middleware processa em 20s
-6. Chatter da fatura mostra ✅ "NF-e Autorizada" + anexa XML + DANFE PDF
+```bash
+ODOO_URL=https://fiscal-cloud-joalherias.odoo.com \
+  ODOO_DB=fiscal-cloud-joalherias \
+  ODOO_USER=marcus@nytro.com.br \
+  ODOO_API_KEY=6ec876e680e4f43fe94645c05ca6097c65e80f2d \
+  python3 odoo-scripts/check-status.py
+```
 
-**Pedido de compra (semanal):**
-1. Novo Pedido de Compra → adicione linha
-2. Selecione **Tipo de Operação**: `compra_interna`, `importacao`, ou `compra_sucata`
-3. Confirme → Receive Products → Create Bill
-4. Estoque de ouro/materiais atualizado
+Vai mostrar `✅ TODAS as abas criadas!` na seção VIEWS.
+
+Depois, faça logout/login no Odoo e abra:
+- Um produto → verá abas Composição de Custo + Formação de Preço + NF-e Joalheria
+- Uma fatura → verá aba NF-e Joalheria com status/chave/protocolo/XML
+- Um pedido de venda → verá colunas x_joa_* na tree
+- Um pedido de compra → verá colunas x_joa_* na tree
