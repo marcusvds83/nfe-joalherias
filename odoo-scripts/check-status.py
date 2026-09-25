@@ -109,24 +109,45 @@ except Exception as e:
 
 
 # ============================================================
-# 3. VIEWS CUSTOMIZADAS
+# 3. VIEWS CUSTOMIZADAS (inclui Odoo Studio customizations)
 # ============================================================
 print('\n' + '=' * 60)
-print('VIEWS CUSTOMIZADAS (Joalheria)')
+print('VIEWS CUSTOMIZADAS (Joalheria / Odoo Studio)')
 print('=' * 60)
 
+# Procura views criadas pelo usuario Marcus (uid=2) hoje OU com nome "Joalheria" OU "Odoo Studio"
 try:
     views = kw('ir.ui.view', 'search_read', [
-        [['name', 'like', 'Joalheria']],
-        ['id', 'name', 'model', 'type', 'active', 'inherit_id']
+        ['|', ['|', ['name', 'like', 'Joalheria'], ['name', 'like', 'Odoo Studio']],
+         ['&', ['create_uid', '=', uid], ['create_date', '>=', '2025-09-25 00:00:00']]],
+        ['id', 'name', 'model', 'type', 'inherit_id', 'create_date']
     ])
     if not views:
-        print('  (nenhuma view encontrada - SaaS Trial bloqueia criacao via XML-RPC)')
+        print('  (nenhuma view customizada encontrada)')
         print('  -> Use Odoo Studio para criar as abas (ver ODOO-STUDIO-TUTORIAL.md)')
-    for v in views:
-        print(f'  id={v["id"]:5d} | {v["name"]:50s} | model={v["model"]} | type={v["type"]} | active={v.get("active")}')
+    else:
+        print(f'  Total: {len(views)} views customizadas\n')
+        # Verifica quais modelos já têm aba NF-e
+        modelos_com_aba = set()
+        modelos_esperados = {'product.template', 'account.move', 'res.company',
+                              'sale.order', 'purchase.order'}
+        for v in views:
+            model = v.get('model') or '(qweb)'
+            if model in modelos_esperados or 'studio' in (v.get('name') or '').lower():
+                modelos_com_aba.add(model)
+            inh = v.get('inherit_id')
+            inh_str = f'herda={inh[0]}' if inh else 'primary'
+            print(f'  id={v["id"]:5d} | {(v["name"] or "?")[:60]:60s} | model={model} | type={v["type"]} | {inh_str}')
+
+        print(f'\n  Modelos com aba NF-e ja criada: {sorted(modelos_com_aba)}')
+        faltam = modelos_esperados - modelos_com_aba
+        if faltam:
+            print(f'  FALTAM criar aba em: {sorted(faltam)}')
+            print('  -> Use Odoo Studio (ver ODOO-STUDIO-PASSO3.md)')
+        else:
+            print('  ✅ TODAS as abas criadas!')
 except Exception as e:
-    print(f'  ERRO: {str(e)[:200]}')
+    print(f'  ERRO: {str(e)[:300]}')
 
 
 # ============================================================
