@@ -13,21 +13,9 @@
  */
 
 import crypto from 'crypto';
+import admin from 'firebase-admin';
 import { config, firebaseConfigured } from './config';
 import { openPfx, infoFromCertPem, type ParsedCert } from './pfx';
-
-// Lazy-load firebase-admin (evita crash no startup se env vars estiverem erradas)
-let _admin: typeof import('firebase-admin') | null = null;
-async function getAdmin() {
-  if (_admin) return _admin;
-  try {
-    _admin = await import('firebase-admin');
-    return _admin;
-  } catch (e) {
-    console.error('[FIREBASE-CERT] Erro ao importar firebase-admin:', (e as Error).message);
-    throw e;
-  }
-}
 
 // === Cache em memoria ===
 interface CachedCert {
@@ -53,17 +41,16 @@ async function initFirebase(): Promise<void> {
     return;
   }
   try {
-    const adminLib = await getAdmin();
-    if (adminLib.apps.length === 0) {
-      adminLib.initializeApp({
-        credential: adminLib.credential.cert({
+    if (admin.apps.length === 0) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
           projectId: config.firebase.projectId,
           privateKey: config.firebase.privateKey,
           clientEmail: config.firebase.clientEmail,
         }),
       });
     }
-    db = adminLib.firestore();
+    db = admin.firestore();
     firebaseReady = true;
     console.log(`[FIREBASE-CERT] Firebase inicializado. Projeto: ${config.firebase.projectId}`);
   } catch (e) {
